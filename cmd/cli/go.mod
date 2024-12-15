@@ -1,4 +1,4 @@
-module wpx
+module wpx/cli
 
 go 1.23.4
 
@@ -7,13 +7,9 @@ require (
 	github.com/docker/go-connections v0.5.0
 	github.com/go-mysql-org/go-mysql v1.10.0
 	github.com/opencontainers/image-spec v1.1.0
+	github.com/pkg/errors v0.9.1
 	github.com/tidwall/sjson v1.2.5
 	github.com/urfave/cli/v3 v3.0.0-beta1
-)
-
-require (
-	github.com/cpuguy83/go-md2man/v2 v2.0.5 // indirect
-	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 )
 
 require (
@@ -35,13 +31,11 @@ require (
 	github.com/pingcap/errors v0.11.5-0.20240311024730-e056997136bb // indirect
 	github.com/pingcap/log v1.1.1-0.20230317032135-a0d097d16e22 // indirect
 	github.com/pingcap/tidb/pkg/parser v0.0.0-20241118164214-4f047be191be // indirect
-	github.com/pkg/errors v0.9.1
 	github.com/siddontang/go v0.0.0-20180604090527-bdc77568d726 // indirect
 	github.com/siddontang/go-log v0.0.0-20180807004314-8d05993dda07 // indirect
-	github.com/tidwall/gjson v1.18.0 // indirect
+	github.com/tidwall/gjson v1.14.2 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
-	github.com/tidwall/pretty v1.2.1 // indirect
-	github.com/urfave/cli v1.22.16
+	github.com/tidwall/pretty v1.2.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.58.0 // indirect
 	go.opentelemetry.io/otel v1.33.0 // indirect
