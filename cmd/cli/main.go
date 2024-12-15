@@ -190,7 +190,7 @@ func runAddonFromPath(path string) error {
 
 	rc, err := docker.ImagePull(
 		context.TODO(),
-		"docker.io/library/wordpress",
+		"wordpress",
 		image.PullOptions{},
 	)
 
@@ -209,7 +209,7 @@ func runAddonFromPath(path string) error {
 	createContainerResponse, err := docker.ContainerCreate(
 		context.Background(),
 		&container.Config{
-			Image: "wordpress",
+			Image: "wpxci:latest",
 			Env: []string{
 				"WORDPRESS_DB_HOST=db",
 				"WORDPRESS_DB_USER=" + credentials,
@@ -217,6 +217,10 @@ func runAddonFromPath(path string) error {
 				"WORDPRESS_DB_NAME=wp_" + group,
 				"WORDPRESS_DEBUG=1",
 			},
+			Tty:          true,
+			AttachStdin:  true,
+			AttachStdout: true,
+			AttachStderr: true,
 		},
 		&container.HostConfig{
 			PortBindings: natting.PortMap{
@@ -258,6 +262,41 @@ func runAddonFromPath(path string) error {
 		createContainerResponse.ID,
 		container.StartOptions{},
 	); err != nil {
+		return err
+	}
+
+	containerExec, err := docker.ContainerExecCreate(
+		context.Background(),
+		createContainerResponse.ID,
+		container.ExecOptions{
+			Tty:          true,
+			User:         "root",
+			Privileged:   true,
+			AttachStdin:  true,
+			AttachStderr: true,
+			AttachStdout: true,
+			WorkingDir:   "/var/www/html",
+			Cmd: []string{
+				"/usr/local/bin/wp",
+				"plugin",
+				"activate",
+				slug,
+				"--allow-root",
+			},
+		},
+	)
+
+	if err != nil {
+		return err
+	}
+
+	err = docker.ContainerExecStart(
+		context.Background(),
+		containerExec.ID,
+		container.ExecStartOptions{},
+	)
+
+	if err != nil {
 		return err
 	}
 

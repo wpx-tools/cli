@@ -18,7 +18,6 @@ wpx login --user=jhon
 wpx new plugin awesome-plugin
 cd awesome-plugin
 wpx run
-
 ```
 
 ```
