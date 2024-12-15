@@ -2,11 +2,13 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"io/fs"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -14,6 +16,7 @@ import (
 	"regexp"
 	"runtime"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/docker/docker/api/types/container"
@@ -28,10 +31,12 @@ import (
 	"github.com/pkg/errors"
 	"github.com/tidwall/sjson"
 	"github.com/urfave/cli/v3"
+	"golang.org/x/term"
 )
 
 var (
 	Version = "0.0.1"
+	ApiHost = "https://api.wpx.dev"
 )
 
 type AddonType string
@@ -56,6 +61,7 @@ type AddonInfo struct {
 	Name            string    `key:"${Type} Name" json:"name"`
 	Author          string    `key:"Author" json:"author"`
 	AuthorURI       string    `key:"Author URI" json:"author_uri"`
+	UpdateURI       string    `key:"Update URI" json:"update_uri"`
 	Description     string    `key:"Description" json:"description"`
 	Version         string    `key:"Version" json:"version"`
 	RequiresAtLeast string    `key:"Requires at least" json:"requires_at_least"`
@@ -68,21 +74,25 @@ type AddonInfo struct {
 
 func main() {
 
+	if os.Getenv("WPXDEV") == "true" {
+		ApiHost = "http://localhost:4200"
+	}
+
 	cmd := &cli.Command{
+		Name:  "wpx",
+		Usage: "WordPress Development Lifecycle CLI",
 		Commands: []*cli.Command{
 			{
-				Name:    "version",
-				Aliases: []string{"v"},
-				Usage:   "display version",
+				Name:  "version",
+				Usage: "Display version of this program",
 				Action: func(ctx context.Context, cmd *cli.Command) error {
 					fmt.Println(Version)
 					return nil
 				},
 			},
 			{
-				Name:    "check",
-				Aliases: []string{"c"},
-				Usage:   "check dependinces",
+				Name:  "check",
+				Usage: "Check required dependinces",
 				Action: func(ctx context.Context, cmd *cli.Command) error {
 					checkHasGit()
 					checkHasDocker()
@@ -90,9 +100,8 @@ func main() {
 				},
 			},
 			{
-				Name:    "run",
-				Aliases: []string{"r"},
-				Usage:   "run current plugin or theme",
+				Name:  "test",
+				Usage: "Test current plugin or theme within docker",
 				Flags: []cli.Flag{
 					&cli.StringFlag{
 						Name: "path",
@@ -124,10 +133,52 @@ func main() {
 				},
 			},
 			{
-				Name:    "plugin",
-				Aliases: []string{"t"},
-				Usage:   "options for task templates",
+				Name:  "create",
+				Usage: "Create new plugin or theme",
+				Flags: []cli.Flag{
+					&cli.StringFlag{
+						Name:     "type",
+						Required: true,
+					},
+					&cli.StringFlag{
+						Name:     "slug",
+						Required: true,
+					},
+				},
 				Action: func(ctx context.Context, c *cli.Command) error {
+					return nil
+				},
+			},
+			{
+				Name:    "login",
+				Aliases: []string{"t"},
+				Usage:   "Login to the cloud for deployments",
+				Flags: []cli.Flag{
+					&cli.StringFlag{
+						Name:        "user",
+						Required:    true,
+						DefaultText: "login",
+					},
+				},
+				Action: func(ctx context.Context, c *cli.Command) error {
+
+					fmt.Print("Enter Password: ")
+					password, err := term.ReadPassword(int(syscall.Stdin))
+					if err != nil {
+						panic(err)
+					}
+
+					fmt.Print("\n")
+
+					fmt.Println("Authenticating...")
+
+					if err := auth(c.String("user"), string(password)); err != nil {
+						fmt.Printf("%s\n", err.Error())
+						os.Exit(1)
+					}
+
+					fmt.Println("Authentification successfully")
+
 					return nil
 				},
 			},
@@ -162,6 +213,36 @@ func checkHasDocker() {
 	defer apiClient.Close()
 
 	fmt.Printf("DOCKER VERSION: %s\n", apiClient.ClientVersion())
+}
+
+func auth(user, password string) error {
+
+	payload := bytes.NewBufferString(
+		fmt.Sprintf(
+			`{"user":"%s", "password":"%s"}`,
+			user, password,
+		),
+	)
+
+	resp, err := http.Post(ApiHost+"/auth", "application/json", payload)
+
+	if err != nil {
+		return err
+	}
+
+	if resp.StatusCode != 200 {
+		return errors.New("Authentication failed")
+	}
+
+	data, err := io.ReadAll(resp.Body)
+
+	if err != nil {
+		return err
+	}
+
+	setSetting("auth.key", string(data))
+
+	return nil
 }
 
 // todo: choose container to run into
@@ -207,6 +288,17 @@ func runAddonFromPath(path string) error {
 		return errors.Wrap(err, "Can't create docker wordpress container port")
 	}
 
+	var wpconfextr string
+
+	if os.Getenv("WPXDEV") == "true" {
+
+		wpconfextr = `
+			define('WPX_CORE_DEV', true);
+		`
+
+		fmt.Println("Set WPX_CORE_DEV true")
+	}
+
 	createContainerResponse, err := docker.ContainerCreate(
 		context.Background(),
 		&container.Config{
@@ -217,11 +309,8 @@ func runAddonFromPath(path string) error {
 				"WORDPRESS_DB_PASSWORD=" + credentials,
 				"WORDPRESS_DB_NAME=wp_" + group,
 				"WORDPRESS_DEBUG=1",
+				"WORDPRESS_CONFIG_EXTRA=" + wpconfextr,
 			},
-			Tty:          true,
-			AttachStdin:  true,
-			AttachStdout: true,
-			AttachStderr: true,
 		},
 		&container.HostConfig{
 			PortBindings: natting.PortMap{

@@ -47,6 +47,7 @@ require (
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.27.0 // indirect
 	golang.org/x/sys v0.28.0 // indirect
+	golang.org/x/term v0.27.0
 	golang.org/x/text v0.21.0 // indirect
 	golang.org/x/time v0.8.0 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
