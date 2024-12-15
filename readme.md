@@ -1,6 +1,6 @@
 # WordPress Development CLI
 
-This is a cli tool for developing WordPress themes and plugins.
+This is a CLI tool for developing WordPress themes and plugins.
 
 **Features:**
 
